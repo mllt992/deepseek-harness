@@ -220,28 +220,30 @@
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
 
-    # The right Sidebar: one docking surface per session over ui-dockkit.
-    - id: ui-sidebar-right
-      name: '@deepseek-ai/dsh-client-ui-sidebar-right'
+    # Right-sidebar family removed from the Web composition: ui-sidebar-right's
+    # client bundle value-requires @deepseek-ai/dsh-client-ui-dockkit, which is
+    # a browser PLATFORM_MODULES seed with no dsh.client factory. Host
+    # ClientModuleRegistry therefore cannot materialize that require and the
+    # whole web profile fails to boot. Restore together with a host-side
+    # resolution path for platform seeds.
+    # - id: ui-sidebar-right
+    #   name: '@deepseek-ai/dsh-client-ui-sidebar-right'
 
 
     - id: office-to-pdf
       name: '@deepseek-ai/dsh-office-to-pdf'
 
-    # The right Sidebar's document tab: bounded file reads with selectable
-    # Markdown, code, HTML, PDF, Office, and plain-text renderers.
-    - id: ui-sidebar-documentpreview
-      name: '@deepseek-ai/dsh-client-ui-sidebar-documentpreview'
+    # - id: ui-sidebar-documentpreview
+    #   name: '@deepseek-ai/dsh-client-ui-sidebar-documentpreview'
 
     # Sandboxed HTTP(S) Browser tabs, including loopback targets.
     - id: ui-sidebar-browser
       name: '@deepseek-ai/dsh-client-ui-sidebar-browser'
 
-    - id: ui-sidebar-terminal
-      name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
-    # The right Sidebar's workspace file tree tab type.
-    - id: ui-sidebar-files
-      name: '@deepseek-ai/dsh-client-ui-sidebar-files'
+    # - id: ui-sidebar-terminal
+    #   name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
+    # - id: ui-sidebar-files
+    #   name: '@deepseek-ai/dsh-client-ui-sidebar-files'
 
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
@@ -272,8 +274,9 @@
     - id: ui-approval
       name: '@deepseek-ai/dsh-client-ui-approval'
 
-    - id: ui-chat
-      name: '@deepseek-ai/dsh-client-ui-chat'
+    # ui-chat injects sidebarRight; removed with the right-sidebar family.
+    # - id: ui-chat
+    #   name: '@deepseek-ai/dsh-client-ui-chat'
 
     # Official occupants for the generic sidebar and conversation brand slots.
     - id: ui-brand-official
@@ -317,14 +320,15 @@
     - id: ui-commands
       name: '@deepseek-ai/dsh-client-ui-commands'
 
-    - id: ui-skill
-      name: '@deepseek-ai/dsh-client-ui-skill'
+    # ui-skill / ui-reference inject sidebarRight; removed with that family.
+    # - id: ui-skill
+    #   name: '@deepseek-ai/dsh-client-ui-skill'
 
     - id: ui-subagent
       name: '@deepseek-ai/dsh-client-ui-subagent'
 
-    - id: ui-reference
-      name: '@deepseek-ai/dsh-client-ui-reference'
+    # - id: ui-reference
+    #   name: '@deepseek-ai/dsh-client-ui-reference'
 
     # Read-only active Schedule catalog. The shipped Web graph resolves the
     # client package but leaves it disabled; the explicit Schedule overlay

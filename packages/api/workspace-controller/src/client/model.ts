@@ -13,7 +13,6 @@ import type {
   WorkspaceDeleteValue,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
-  WorkspaceUnarchiveSessionRequest,
   WorkspaceValue,
   WorkspaceId,
   WorkspaceView,
@@ -178,21 +177,6 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
-   * Unarchive one Session and install the returned complete archive set.
-   * A reply superseded by a later archive request or a pushed set installs nothing.
-   * @param sessionId - Session to unarchive.
-   * @returns generated Remote result.
-   */
-  async unarchiveSession(
-    sessionId: WorkspaceUnarchiveSessionRequest['sessionId'],
-  ): Promise<RemoteResult<WorkspaceArchiveValue>> {
-    const requestSeq = ++this.archiveRequestSeq
-    const result = await this.remote.unarchiveSession({ sessionId })
-    if (result.ok && requestSeq === this.archiveRequestSeq) {
-      this.installArchived(result.value.archivedSessionIds)
-    }
-    return result
-  }
 
   /**
    * Replace the projection from one complete stream-generation baseline.
