@@ -25,6 +25,8 @@
  * not kill the prewarm other consumers will hit, so it carries its own
  * abort (fired only on invalidation/teardown) while a candidates caller
  * with an aborted signal just returns early.
+ * Catalog RPCs retain an existing Client Session through completion and
+ * wait for its initial history open to succeed before contacting the Host.
  *
  * This browser half also owns the `skill` keyed toolview: a replay-stable
  * accent row derived only from each logged call/result slice.
@@ -42,8 +44,19 @@ import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { SkillRow } from './SkillRow.tsx'
+import { SkillReference, type SkillReferenceInjected } from './SkillReference.tsx'
+import { skillReferenceRule } from './user-text-rules.ts'
+export type {} from './user-text-rules.ts'
 import { en, NS, zh, type SkillKey } from './locales.ts'
+
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    /** A skill-catalog fetch waiting for initial history and its RPC result. */
+    skillCatalog: unknown
+  }
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -61,7 +74,7 @@ interface CatalogFetch {
 }
 
 /** Required services: reference source faces plus the tool-row and locale registries. */
-export const inject = ['inputTriggers', 'sessions', 'slots', 'locale', 'remote', 'remote.skills', 'sidebarRight']
+export const inject = ['inputTriggers', 'sessions', 'slots', 'locale', 'remote', 'remote.skills', 'sidebarRight', 'uiConversation']
 
 /**
  * Client plugin body: register the '/' source, dictionaries, and keyed tool row.
@@ -69,6 +82,7 @@ export const inject = ['inputTriggers', 'sessions', 'slots', 'locale', 'remote',
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-skill: dictionaries')
+  ctx.uiConversation.userText.register(skillReferenceRule)
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
     { name: 'tool.call.toolview', key: 'skill', locale: NS },
     SkillRow,
@@ -100,10 +114,20 @@ export function apply(ctx: ClientContext): void {
     if (existing !== undefined) return existing
     const abort = new AbortController()
     const promise = (async () => {
-      const result = await skills.list({ sessionId }, abort.signal)
-      abort.signal.throwIfAborted()
-      if (!result.ok) throw new Error(`skills/list failed: ${result.error.code}: ${result.error.message}`)
-      return result.value.skills
+      if (sessions.binding(sessionId) === undefined) {
+        throw new Error(`skill catalog requires a retained session "${sessionId}"`)
+      }
+      return sessions.using(sessionId, { source: 'skillCatalog', signal: abort.signal }, async (reference) => {
+        abort.signal.throwIfAborted()
+        const state = reference.binding.session.getSnapshot()
+        if (state.openState !== 'open') {
+          throw state.openError ?? new Error(`session "${sessionId}" is not open`)
+        }
+        const result = await skills.list({ sessionId }, abort.signal)
+        abort.signal.throwIfAborted()
+        if (!result.ok) throw new Error(`skills/list failed: ${result.error.code}: ${result.error.message}`)
+        return result.value.skills
+      })
     })()
     const entry: CatalogFetch = { promise, abort }
     fetches.set(sessionId, entry)
@@ -137,7 +161,7 @@ export function apply(ctx: ClientContext): void {
   // locale service's own fallback ladder; candidate-time reads stay plain text.
   const t = ctx.locale.bind(NS)
 
-  const source: InputTriggerSource = {
+  const source = {
     trigger: '/',
     name: 'skill',
     order: 2,
@@ -204,7 +228,20 @@ export function apply(ctx: ClientContext): void {
       // line client-side before it ever becomes a prompt.
       return { text: `/${candidate.name} ` }
     },
-  }
+  } satisfies InputTriggerSource
+
+  ctx.slots.inject('conversation.user.text.node', () => ctx.slots.register({
+    name: 'conversation.user.text.node',
+    key: 'skill',
+    priority: 100,
+    inject: (sessionId): SkillReferenceInjected => ({
+      openSkill: (name) => {
+        if (sessions.scope(sessionId) === undefined) return
+        source.openReference({ sessionId }, { ref: `/${name}` })
+      },
+    }),
+  }, SkillReference))
+
   const inputTriggers = ctx.get('inputTriggers') as InputTriggerServiceContract
   // A preset decides which skill providers an agent reads, so a switched
   // session's cached catalog belongs to the composition it no longer runs.
